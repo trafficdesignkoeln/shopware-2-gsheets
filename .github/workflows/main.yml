@@ -19,15 +19,26 @@ jobs:
 
       - name: Install dependencies
         run: |
+          pip install --upgrade pip
           pip install -r requirements.txt
 
       - name: Set up service account file
         env:
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
-        run: echo "$GOOGLE_SERVICE_ACCOUNT_JSON" > service-account.json
+        run: |
+          if [[ -z "$GOOGLE_SERVICE_ACCOUNT_JSON" ]]; then
+            echo "❌ ERROR: GOOGLE_SERVICE_ACCOUNT_JSON is not set!"
+            exit 1
+          fi
+          echo "$GOOGLE_SERVICE_ACCOUNT_JSON" > service-account.json
 
       - name: Run script
         env:
           SHOPWARE_CLIENT_ID: ${{ secrets.SHOPWARE_CLIENT_ID }}
           SHOPWARE_CLIENT_SECRET: ${{ secrets.SHOPWARE_CLIENT_SECRET }}
-        run: python shopware_API.py  # Replace with the actual script filename
+        run: |
+          if [[ -z "$SHOPWARE_CLIENT_ID" || -z "$SHOPWARE_CLIENT_SECRET" ]]; then
+            echo "❌ ERROR: SHOPWARE_CLIENT_ID or SHOPWARE_CLIENT_SECRET is not set!"
+            exit 1
+          fi
+          python shopware_API.py  # Replace with the actual script filename
