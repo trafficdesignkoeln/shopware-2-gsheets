@@ -17,7 +17,25 @@ SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/1YIz6plMZUPPu6QsRoCLWa
 TARGET_SHEET = '[Data] Shopware Orders NEW'
 
 
+# Check if GOOGLE_SERVICE_ACCOUNT_JSON exists
+google_json = os.getenv('GOOGLE_SERVICE_ACCOUNT_JSON')
 
+if not google_json:
+    print("❌ ERROR: GOOGLE_SERVICE_ACCOUNT_JSON is not set or empty!")
+    exit(1)
+
+try:
+    service_account_info = json.loads(google_json)
+except json.JSONDecodeError:
+    print("❌ ERROR: GOOGLE_SERVICE_ACCOUNT_JSON is not valid JSON!")
+    exit(1)
+
+# Save to file
+SERVICE_ACCOUNT_FILE = 'service-account.json'
+with open(SERVICE_ACCOUNT_FILE, 'w') as f:
+    json.dump(service_account_info, f)
+
+print("✅ Google Service Account JSON successfully saved!")
 try:
     locale.setlocale(locale.LC_ALL, 'de_DE.UTF-8')
 except locale.Error:
