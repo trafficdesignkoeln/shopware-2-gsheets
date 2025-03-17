@@ -3,4 +3,3 @@ pandas
 gspread
 gspread-dataframe
 python-dateutil
-locale
