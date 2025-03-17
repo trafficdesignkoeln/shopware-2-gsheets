@@ -33,10 +33,19 @@ except locale.Error:
 CLIENT_ID = os.getenv('SHOPWARE_CLIENT_ID')
 CLIENT_SECRET = os.getenv('SHOPWARE_CLIENT_SECRET')
 
-# Save Google Service Account JSON from environment variable
+# Retrieve the service account JSON from environment variables
+google_json = os.getenv('GOOGLE_SERVICE_ACCOUNT_JSON')
+
+if not google_json:
+    raise ValueError("❌ ERROR: GOOGLE_SERVICE_ACCOUNT_JSON is not set!")
+
+# Load the JSON correctly
+service_account_info = json.loads(google_json)
+
+# Save it as a service account file
 SERVICE_ACCOUNT_FILE = 'service-account.json'
 with open(SERVICE_ACCOUNT_FILE, 'w') as f:
-    f.write(os.getenv('GOOGLE_SERVICE_ACCOUNT_JSON'))
+    json.dump(service_account_info, f)
 
 def get_shopware_access_token():
     headers = {
