@@ -30,4 +30,4 @@ jobs:
         env:
           SHOPWARE_CLIENT_ID: ${{ secrets.SHOPWARE_CLIENT_ID }}
           SHOPWARE_CLIENT_SECRET: ${{ secrets.SHOPWARE_CLIENT_SECRET }}
-        run: python your_script.py  # Replace with the actual script filename
+        run: python shopware_API.py  # Replace with the actual script filename
