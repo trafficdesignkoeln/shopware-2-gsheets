@@ -5,6 +5,8 @@ from gspread_dataframe import set_with_dataframe
 from datetime import datetime
 from dateutil import parser  # Handles ISO 8601 dates with timezones
 import locale
+import os
+import json
 
 # ------------------------------------------------------------------------------
 # CONFIGURATION
@@ -12,7 +14,6 @@ import locale
 SHOPWARE_API_URL = "https://www.mediatec.de/api/search/order"
 SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/1YIz6plMZUPPu6QsRoCLWawIKpnwJRhp0xnP4PFkXajw/edit?pli=1&gid=1254539016#gid=1254539016'
 TARGET_SHEET = '[Data] Shopware Orders NEW'
-SERVICE_ACCOUNT_FILE = 'service-account.json'
 
 # Set German locale for proper number formatting
 locale.setlocale(locale.LC_ALL, 'de_DE.UTF-8')
@@ -21,9 +22,15 @@ locale.setlocale(locale.LC_ALL, 'de_DE.UTF-8')
 # AUTHENTICATE WITH SHOPWARE API
 # ------------------------------------------------------------------------------
 # Define constants
-TOKEN_ENDPOINT = "https://www.mediatec.de/api/oauth/token"
-CLIENT_ID = "SWIATWW2TZLZU2HEBU9LZNP3UW"  # Your Zugangs ID
-CLIENT_SECRET = "emVGOWl1YVhXUlgwRHBQQzd6emJYdEh4b2pYTGRsNERSSkM0dU0"  # Your Sicherheitsschlüssel
+
+
+CLIENT_ID = os.getenv('SHOPWARE_CLIENT_ID')
+CLIENT_SECRET = os.getenv('SHOPWARE_CLIENT_SECRET')
+
+# Save Google Service Account JSON from environment variable
+SERVICE_ACCOUNT_FILE = 'service-account.json'
+with open(SERVICE_ACCOUNT_FILE, 'w') as f:
+    f.write(os.getenv('GOOGLE_SERVICE_ACCOUNT_JSON'))
 
 def get_shopware_access_token():
     headers = {
