@@ -1,41 +1,45 @@
-import requests
-import pandas as pd
-from gspread import service_account
-from gspread_dataframe import set_with_dataframe
-from datetime import datetime
-from dateutil import parser  # Handles ISO 8601 dates with timezones
-import locale
 import os
 import json
 import locale
+import requests
+import pandas as pd
+import gspread
+from gspread_dataframe import set_with_dataframe
+from google.oauth2 import service_account
+from datetime import datetime
+from dateutil import parser  # Handles ISO 8601 dates with timezones
 
 # ------------------------------------------------------------------------------
 # CONFIGURATION
 # ------------------------------------------------------------------------------
 SHOPWARE_API_URL = "https://www.mediatec.de/api/search/order"
-SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/1YIz6plMZUPPu6QsRoCLWawIKpnwJRhp0xnP4PFkXajw/edit?pli=1&gid=1254539016#gid=1254539016'
-TARGET_SHEET = '[Data] Shopware Orders NEW'
+SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1YIz6plMZUPPu6QsRoCLWawIKpnwJRhp0xnP4PFkXajw/edit?pli=1&gid=1254539016#gid=1254539016"
+TARGET_SHEET = "[Data] Shopware Orders NEW"
 
+# Load credentials from environment variables
+CLIENT_ID = os.getenv("SHOPWARE_CLIENT_ID")
+CLIENT_SECRET = os.getenv("SHOPWARE_CLIENT_SECRET")
+GOOGLE_SERVICE_ACCOUNT_JSON = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
 
-# Check if GOOGLE_SERVICE_ACCOUNT_JSON exists
-google_json = os.getenv('GOOGLE_SERVICE_ACCOUNT_JSON')
+# Check if required environment variables are set
+if not CLIENT_ID or not CLIENT_SECRET:
+    raise ValueError("❌ ERROR: SHOPWARE_CLIENT_ID or SHOPWARE_CLIENT_SECRET is not set!")
 
-if not google_json:
-    print("❌ ERROR: GOOGLE_SERVICE_ACCOUNT_JSON is not set or empty!")
-    exit(1)
+if not GOOGLE_SERVICE_ACCOUNT_JSON:
+    raise ValueError("❌ ERROR: GOOGLE_SERVICE_ACCOUNT_JSON is not set!")
 
+# Parse Google Service Account JSON
 try:
-    service_account_info = json.loads(google_json)
+    service_account_info = json.loads(GOOGLE_SERVICE_ACCOUNT_JSON)
 except json.JSONDecodeError:
-    print("❌ ERROR: GOOGLE_SERVICE_ACCOUNT_JSON is not valid JSON!")
-    exit(1)
+    raise ValueError("❌ ERROR: GOOGLE_SERVICE_ACCOUNT_JSON is not valid JSON!")
 
-# Save to file
-SERVICE_ACCOUNT_FILE = 'service-account.json'
-with open(SERVICE_ACCOUNT_FILE, 'w') as f:
-    json.dump(service_account_info, f)
+# Set up Google Sheets authentication
+SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
+credentials = service_account.Credentials.from_service_account_info(service_account_info, scopes=SCOPES)
+client = gspread.authorize(credentials)
 
-print("✅ Google Service Account JSON successfully saved!")
+# Set German locale for proper number formatting
 try:
     locale.setlocale(locale.LC_ALL, 'de_DE.UTF-8')
 except locale.Error:
@@ -45,48 +49,27 @@ except locale.Error:
 # ------------------------------------------------------------------------------
 # AUTHENTICATE WITH SHOPWARE API
 # ------------------------------------------------------------------------------
-# Define constants
-
-
-CLIENT_ID = os.getenv('SHOPWARE_CLIENT_ID')
-CLIENT_SECRET = os.getenv('SHOPWARE_CLIENT_SECRET')
-
-# Retrieve the service account JSON from environment variables
-google_json = os.getenv('GOOGLE_SERVICE_ACCOUNT_JSON')
-
-if not google_json:
-    raise ValueError("❌ ERROR: GOOGLE_SERVICE_ACCOUNT_JSON is not set!")
-
-# Load the JSON correctly
-service_account_info = json.loads(google_json)
-
-# Save it as a service account file
-SERVICE_ACCOUNT_FILE = 'service-account.json'
-with open(SERVICE_ACCOUNT_FILE, 'w') as f:
-    json.dump(service_account_info, f)
+TOKEN_ENDPOINT = "https://www.mediatec.de/api/oauth/token"
 
 def get_shopware_access_token():
-    headers = {
-        'Content-Type': 'application/json'
-    }
+    headers = {'Content-Type': 'application/json'}
     payload = {
         'grant_type': 'client_credentials',
         'client_id': CLIENT_ID,
         'client_secret': CLIENT_SECRET
     }
+    
     response = requests.post(TOKEN_ENDPOINT, json=payload, headers=headers)
     
-    print(f"Response Status Code: {response.status_code}")
-    print(f"Response Content: {response.content.decode('utf-8')}")  # Show detailed error message if any
+    if response.status_code != 200:
+        raise ValueError(f"❌ ERROR: Failed to retrieve access token. Response: {response.text}")
     
-    response.raise_for_status()  # Raise HTTPError for bad responses
     token = response.json().get('access_token')
-    
     if token:
         print("✅ Access token retrieved successfully.")
     else:
-        print("❌ Failed to retrieve access token.")
-    
+        raise ValueError("❌ ERROR: Access token is missing in response.")
+
     return token
 
 # ------------------------------------------------------------------------------
@@ -106,26 +89,17 @@ def fetch_orders(access_token):
     while has_more_data:
         payload = {
             "filter": [
-                {
-                    "type": "equals",
-                    "field": "transactions.stateMachineState.technicalName",
-                    "value": "paid"
-                },
-                {
-                    "type": "range",
-                    "field": "orderDateTime",
-                    "parameters": {
-                        "gte": "2022-01-01T00:00:00.000Z"
-                    }
-                }
+                {"type": "equals", "field": "transactions.stateMachineState.technicalName", "value": "paid"},
+                {"type": "range", "field": "orderDateTime", "parameters": {"gte": "2022-01-01T00:00:00.000Z"}}
             ],
             "limit": limit,
             "page": page
         }
+
         response = requests.post(SHOPWARE_API_URL, headers=headers, json=payload)
-        
+
         if response.status_code != 200:
-            print(f"❌ Error fetching data: Response Code {response.status_code}")
+            print(f"❌ ERROR: Failed to fetch orders. Response: {response.text}")
             break
 
         data = response.json().get('data', [])
@@ -137,13 +111,12 @@ def fetch_orders(access_token):
         for order in data:
             date_str = order['orderDateTime']
             try:
-                # Use dateutil parser to handle ISO format with timezone
                 date_obj = parser.isoparse(date_str)
             except ValueError:
-                print(f"❌ Error parsing date: {date_str}")
-                continue  # Skip this entry if date parsing fails
+                print(f"❌ ERROR: Unable to parse date: {date_str}")
+                continue  # Skip if parsing fails
 
-            date = date_obj.strftime("%Y-%m-%d")  # Convert back to string if needed
+            date = date_obj.strftime("%Y-%m-%d")  # Convert to YYYY-MM-DD
             revenue = float(order.get('amountNet', 0))
 
             if date not in aggregated_data:
@@ -152,7 +125,7 @@ def fetch_orders(access_token):
             aggregated_data[date]['orders'] += 1
             aggregated_data[date]['revenue'] += revenue
 
-        page += 1  # Move to next page
+        page += 1
 
     return aggregated_data
 
@@ -165,7 +138,7 @@ def process_data(aggregated_data):
 
     for date in sorted_dates:
         date_obj = datetime.strptime(date, "%Y-%m-%d")
-        formatted_date = date_obj.strftime("%Y-%m-%d")  # Date only, no time
+        formatted_date = date_obj.strftime("%Y-%m-%d")  # Keep date format
         orders = aggregated_data[date]['orders']
         revenue = locale.format_string("%.2f", aggregated_data[date]['revenue']).replace('.', ',')
 
@@ -174,35 +147,52 @@ def process_data(aggregated_data):
     # Create DataFrame
     df = pd.DataFrame(data_to_insert, columns=["Date", "Number of Orders", "Revenue (Net)"])
     
-    # 🛠 Parse Date column as date-only (no time)
-    df['Date'] = pd.to_datetime(df['Date']).dt.date  # Extract only date part
-    
-    # 🛠 Ensure 'Number of Orders' is an integer
+    # Convert columns to correct data types
+    df['Date'] = pd.to_datetime(df['Date']).dt.date
     df['Number of Orders'] = pd.to_numeric(df['Number of Orders'], errors='coerce').fillna(0).astype(int)
-    
-    # 🛠 Convert 'Revenue (Net)' column to float
     df['Revenue (Net)'] = df['Revenue (Net)'].str.replace('.', '', regex=False).str.replace(',', '.', regex=False).astype(float)
-    
-    # 🔍 Show data types and preview data to confirm changes
-    print("\n🔄 Data Types After Parsing:")
-    print(df.dtypes)
-    print("\n📊 Preview Data:")
-    print(df.head(10))  # Show first 10 rows for inspection
-    
+
+    print("\n📊 Processed Data Preview:")
+    print(df.head(10))  # Display first 10 rows
+
     return df
+
 # ------------------------------------------------------------------------------
 # EXPORT TO GOOGLE SHEETS
 # ------------------------------------------------------------------------------
 def export_to_google_sheets(df):
-    client = service_account(filename=SERVICE_ACCOUNT_FILE)
     spreadsheet = client.open_by_url(SPREADSHEET_URL)
     worksheet = spreadsheet.worksheet(TARGET_SHEET)
     worksheet.clear()
 
-    # 🛠 Explicitly set format to Plain Text for 'Number of Orders' to avoid date conversion
-    worksheet.format('B2:B', {'numberFormat': {'type': 'NUMBER'}})  # Ensure column B is formatted as a number
+    # Ensure 'Number of Orders' is formatted correctly in Google Sheets
+    worksheet.format('B2:B', {'numberFormat': {'type': 'NUMBER'}})
 
     # Export DataFrame to Google Sheets
     set_with_dataframe(worksheet, df, include_index=False, include_column_header=True, resize=True)
 
     print(f"✅ Data exported successfully to Google Sheet: '{TARGET_SHEET}'")
+
+# ------------------------------------------------------------------------------
+# MAIN EXECUTION
+# ------------------------------------------------------------------------------
+if __name__ == "__main__":
+    print("🚀 Starting Shopware Order Sync...")
+
+    # Get Shopware access token
+    access_token = get_shopware_access_token()
+
+    # Fetch order data
+    orders_data = fetch_orders(access_token)
+
+    if not orders_data:
+        print("⚠️ No order data found. Exiting.")
+        exit(0)
+
+    # Process data
+    df = process_data(orders_data)
+
+    # Export to Google Sheets
+    export_to_google_sheets(df)
+
+    print("🎉 Sync complete!")
