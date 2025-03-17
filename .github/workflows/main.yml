@@ -22,15 +22,27 @@ jobs:
           pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Set up service account file
+      - name: Debug Environment Variables
         env:
+          SHOPWARE_CLIENT_ID: ${{ secrets.SHOPWARE_CLIENT_ID }}
+          SHOPWARE_CLIENT_SECRET: ${{ secrets.SHOPWARE_CLIENT_SECRET }}
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
         run: |
+          echo "🔍 Checking environment variables..."
+          echo "SHOPWARE_CLIENT_ID length: ${#SHOPWARE_CLIENT_ID}"
+          echo "SHOPWARE_CLIENT_SECRET length: ${#SHOPWARE_CLIENT_SECRET}"
+          echo "GOOGLE_SERVICE_ACCOUNT_JSON length: ${#GOOGLE_SERVICE_ACCOUNT_JSON}"
           if [[ -z "$GOOGLE_SERVICE_ACCOUNT_JSON" ]]; then
             echo "❌ ERROR: GOOGLE_SERVICE_ACCOUNT_JSON is not set!"
             exit 1
           fi
-          echo "$GOOGLE_SERVICE_ACCOUNT_JSON" > service-account.json
+
+      - name: Set up Google Service Account
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+        run: |
+          echo "$GOOGLE_SERVICE_ACCOUNT_JSON" | jq . > service-account.json
+          echo "✅ Google Service Account JSON successfully written to file."
 
       - name: Run script
         env:
