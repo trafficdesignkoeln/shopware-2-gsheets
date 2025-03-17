@@ -32,6 +32,15 @@ jobs:
           echo "SHOPWARE_CLIENT_ID length: ${#SHOPWARE_CLIENT_ID}"
           echo "SHOPWARE_CLIENT_SECRET length: ${#SHOPWARE_CLIENT_SECRET}"
           echo "GOOGLE_SERVICE_ACCOUNT_JSON length: ${#GOOGLE_SERVICE_ACCOUNT_JSON}"
+
+          if [[ -z "$SHOPWARE_CLIENT_ID" ]]; then
+            echo "❌ ERROR: SHOPWARE_CLIENT_ID is not set!"
+            exit 1
+          fi
+          if [[ -z "$SHOPWARE_CLIENT_SECRET" ]]; then
+            echo "❌ ERROR: SHOPWARE_CLIENT_SECRET is not set!"
+            exit 1
+          fi
           if [[ -z "$GOOGLE_SERVICE_ACCOUNT_JSON" ]]; then
             echo "❌ ERROR: GOOGLE_SERVICE_ACCOUNT_JSON is not set!"
             exit 1
@@ -48,9 +57,5 @@ jobs:
         env:
           SHOPWARE_CLIENT_ID: ${{ secrets.SHOPWARE_CLIENT_ID }}
           SHOPWARE_CLIENT_SECRET: ${{ secrets.SHOPWARE_CLIENT_SECRET }}
-        run: |
-          if [[ -z "$SHOPWARE_CLIENT_ID" || -z "$SHOPWARE_CLIENT_SECRET" ]]; then
-            echo "❌ ERROR: SHOPWARE_CLIENT_ID or SHOPWARE_CLIENT_SECRET is not set!"
-            exit 1
-          fi
-          python shopware_API.py  # Replace with the actual script filename
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+        run: python shopware_API.py  # Replace with the actual script filename
