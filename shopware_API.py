@@ -7,6 +7,7 @@ from dateutil import parser  # Handles ISO 8601 dates with timezones
 import locale
 import os
 import json
+import locale
 
 # ------------------------------------------------------------------------------
 # CONFIGURATION
@@ -15,8 +16,13 @@ SHOPWARE_API_URL = "https://www.mediatec.de/api/search/order"
 SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/1YIz6plMZUPPu6QsRoCLWawIKpnwJRhp0xnP4PFkXajw/edit?pli=1&gid=1254539016#gid=1254539016'
 TARGET_SHEET = '[Data] Shopware Orders NEW'
 
-# Set German locale for proper number formatting
-locale.setlocale(locale.LC_ALL, 'de_DE.UTF-8')
+
+
+try:
+    locale.setlocale(locale.LC_ALL, 'de_DE.UTF-8')
+except locale.Error:
+    print("⚠️ Locale 'de_DE.UTF-8' is not available. Using default locale.")
+    locale.setlocale(locale.LC_ALL, '')  # Use system default
 
 # ------------------------------------------------------------------------------
 # AUTHENTICATE WITH SHOPWARE API
