@@ -1,0 +1,33 @@
+name: Daily Shopware Order Sync
+
+on:
+  schedule:
+    - cron: "0 2 * * *"  # Runs at 02:00 UTC every day
+  workflow_dispatch:  # Allows manual trigger
+
+jobs:
+  update-orders:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'  # Adjust if needed
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Set up service account file
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+        run: echo "$GOOGLE_SERVICE_ACCOUNT_JSON" > service-account.json
+
+      - name: Run script
+        env:
+          SHOPWARE_CLIENT_ID: ${{ secrets.SHOPWARE_CLIENT_ID }}
+          SHOPWARE_CLIENT_SECRET: ${{ secrets.SHOPWARE_CLIENT_SECRET }}
+        run: python your_script.py  # Replace with the actual script filename
