@@ -88,7 +88,7 @@ def fetch_orders(access_token):
                     "queries": [
                         {"type": "equals", "field": "transactions.stateMachineState.technicalName", "value": "paid"},
                         {"type": "equals", "field": "transactions.stateMachineState.technicalName", "value": "in_progress"},
-                        {"type": "equals", "field": "transactions.stateMachineState.technicalName", "value": "refunded_partially"}, 
+                        {"type": "equals", "field": "transactions.stateMachineState.technicalName", "value": "refunded_partially"},
                         {"type": "equals", "field": "transactions.stateMachineState.technicalName", "value": "refunded"}
                     ]
                 },
@@ -135,8 +135,17 @@ def fetch_orders(access_token):
                 continue
 
             date = date_obj.strftime("%Y-%m-%d")
-            revenue_net = float(order.get('amountNet', 0))
-            revenue_total = float(order.get('amountTotal', 0))
+
+            transactions = order.get('transactions') or []
+            status = transactions[0].get('stateMachineState', {}).get('technicalName', '') if transactions else 'unknown'
+
+            # Set revenue to 0 if refunded
+            if status in ['refunded', 'refunded_partially']:
+                revenue_net = 0.0
+                revenue_total = 0.0
+            else:
+                revenue_net = float(order.get('amountNet', 0))
+                revenue_total = float(order.get('amountTotal', 0))
 
             if date not in aggregated_data:
                 aggregated_data[date] = {'orders': 0, 'revenue_net': 0.0, 'revenue_total': 0.0}
