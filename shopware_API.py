@@ -87,9 +87,7 @@ def fetch_orders(access_token):
                     "operator": "OR",
                     "queries": [
                         {"type": "equals", "field": "transactions.stateMachineState.technicalName", "value": "paid"},
-                        {"type": "equals", "field": "transactions.stateMachineState.technicalName", "value": "in_progress"},
-                        {"type": "equals", "field": "transactions.stateMachineState.technicalName", "value": "open"},
-                        {"type": "equals", "field": "transactions.stateMachineState.technicalName", "value": "unconfirmed"}
+                        {"type": "equals", "field": "transactions.stateMachineState.technicalName", "value": "in_progress"}
                     ]
                 },
                 {
