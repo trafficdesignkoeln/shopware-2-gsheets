@@ -68,8 +68,11 @@ def fetch_all_orders(access_token):
             break
 
         for order in data:
-            transaction = order.get('transactions', [{}])[0]
-            state = transaction.get('stateMachineState', {}).get('technicalName', 'unknown')
+            transactions = order.get('transactions') or []
+            if transactions:
+                state = transactions[0].get('stateMachineState', {}).get('technicalName', 'unknown')
+            else:
+                state = 'no_transaction'
             status_counts[state] += 1
 
         page += 1
