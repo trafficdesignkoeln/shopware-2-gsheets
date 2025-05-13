@@ -77,6 +77,7 @@ def fetch_orders(access_token):
     page = 1
     has_more_data = True
     aggregated_data = {}
+    seen_order_ids = set()
 
     while has_more_data:
         payload = {
@@ -87,7 +88,8 @@ def fetch_orders(access_token):
                     "queries": [
                         {"type": "equals", "field": "transactions.stateMachineState.technicalName", "value": "paid"},
                         {"type": "equals", "field": "transactions.stateMachineState.technicalName", "value": "in_progress"},
-                        {"type": "equals", "field": "transactions.stateMachineState.technicalName", "value": "open"}
+                        {"type": "equals", "field": "transactions.stateMachineState.technicalName", "value": "open"},
+                        {"type": "equals", "field": "transactions.stateMachineState.technicalName", "value": "unconfirmed"}
                     ]
                 },
                 {
@@ -120,6 +122,11 @@ def fetch_orders(access_token):
             break
 
         for order in data:
+            order_id = order.get('id')
+            if order_id in seen_order_ids:
+                continue  # skip duplicate
+            seen_order_ids.add(order_id)
+
             date_str = order.get('orderDateTime')
             try:
                 date_obj = parser.isoparse(date_str)
