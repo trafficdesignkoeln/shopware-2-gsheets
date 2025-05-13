@@ -13,7 +13,7 @@ from dateutil import parser
 # CONFIGURATION
 # ------------------------------------------------------------------------------
 SHOPWARE_API_URL = "https://www.mediatec.de/api/search/order"
-SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1YIz6plMZUPPu6QsRoCLWawIKpnwJRhp0xnP4PFkXajw/edit?pli=1&gid=1254539016#gid=1254539016"
+SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1YIz6plMZUPPu6QsRoCLWawIKpnwJRhp0xnP4PFkXajw/edit#gid=1254539016"
 TARGET_SHEET = "[Data] Shopware Orders NEW"
 
 CLIENT_ID = os.getenv("SHOPWARE_CLIENT_ID")
@@ -81,7 +81,19 @@ def fetch_orders(access_token):
     while has_more_data:
         payload = {
             "filter": [
-                {"type": "range", "field": "orderDateTime", "parameters": {"gte": "2022-01-01T00:00:00.000Z"}}
+                {
+                    "type": "multi",
+                    "operator": "OR",
+                    "queries": [
+                        {"type": "equals", "field": "transactions.stateMachineState.technicalName", "value": "paid"},
+                        {"type": "equals", "field": "transactions.stateMachineState.technicalName", "value": "processing"}
+                    ]
+                },
+                {
+                    "type": "range",
+                    "field": "orderDateTime",
+                    "parameters": {"gte": "2022-01-01T00:00:00.000Z"}
+                }
             ],
             "limit": limit,
             "page": page
@@ -164,10 +176,8 @@ def export_to_google_sheets(df):
     spreadsheet = client.open_by_url(SPREADSHEET_URL)
     worksheet = spreadsheet.worksheet(TARGET_SHEET)
     worksheet.clear()
-
     worksheet.format('B2:B', {'numberFormat': {'type': 'NUMBER'}})
     set_with_dataframe(worksheet, df, include_index=False, include_column_header=True, resize=True)
-
     print(f"✅ Data exported successfully to Google Sheet: '{TARGET_SHEET}'")
 
 # ------------------------------------------------------------------------------
@@ -175,7 +185,6 @@ def export_to_google_sheets(df):
 # ------------------------------------------------------------------------------
 if __name__ == "__main__":
     print("🚀 Starting Shopware Order Sync...")
-
     access_token = get_shopware_access_token()
     orders_data = fetch_orders(access_token)
 
@@ -185,5 +194,4 @@ if __name__ == "__main__":
 
     df = process_data(orders_data)
     export_to_google_sheets(df)
-
     print("🎉 Sync complete!")
