@@ -13,7 +13,7 @@ from dateutil import parser
 # CONFIGURATION
 # ------------------------------------------------------------------------------
 SHOPWARE_API_URL = "https://www.mediatec.de/api/search/order"
-SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1YIz6plMZUPPu6QsRoCLWawIKpnwJRhp0xnP4PFkXajw/edit?pli=1&gid=1254539016#gid=1254539016"
+SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1YIz6plMZUPPu6QsRoCLWawIKpnwJRhp0xnP4PFkXajw/edit#gid=1254539016"
 TARGET_SHEET = "[Data] Shopware Orders NEW"
 
 CLIENT_ID = os.getenv("SHOPWARE_CLIENT_ID")
@@ -77,14 +77,36 @@ def fetch_orders(access_token):
     page = 1
     has_more_data = True
     aggregated_data = {}
+    seen_order_ids = set()
 
     while has_more_data:
         payload = {
             "filter": [
-                {"type": "range", "field": "orderDateTime", "parameters": {"gte": "2022-01-01T00:00:00.000Z"}}
+                {
+                    "type": "multi",
+                    "operator": "OR",
+                    "queries": [
+                        {"type": "equals", "field": "transactions.stateMachineState.technicalName", "value": "paid"},
+                        {"type": "equals", "field": "transactions.stateMachineState.technicalName", "value": "in_progress"},
+                        {"type": "equals", "field": "transactions.stateMachineState.technicalName", "value": "refunded_partially"},
+                        {"type": "equals", "field": "transactions.stateMachineState.technicalName", "value": "refunded"}
+                    ]
+                },
+                {
+                    "type": "range",
+                    "field": "orderDateTime",
+                    "parameters": {"gte": "2022-01-01T00:00:00.000Z"}
+                }
             ],
             "limit": limit,
-            "page": page
+            "page": page,
+            "associations": {
+                "transactions": {
+                    "associations": {
+                        "stateMachineState": {}
+                    }
+                }
+            }
         }
 
         response = requests.post(SHOPWARE_API_URL, headers=headers, json=payload)
@@ -100,6 +122,11 @@ def fetch_orders(access_token):
             break
 
         for order in data:
+            order_id = order.get('id')
+            if order_id in seen_order_ids:
+                continue  # skip duplicate
+            seen_order_ids.add(order_id)
+
             date_str = order.get('orderDateTime')
             try:
                 date_obj = parser.isoparse(date_str)
@@ -108,8 +135,17 @@ def fetch_orders(access_token):
                 continue
 
             date = date_obj.strftime("%Y-%m-%d")
+
+            transactions = order.get('transactions') or []
+            status = transactions[0].get('stateMachineState', {}).get('technicalName', '') if transactions else 'unknown'
+
             revenue_net = float(order.get('amountNet', 0))
             revenue_total = float(order.get('amountTotal', 0))
+
+            # If refunded, subtract revenue
+            if status in ['refunded', 'refunded_partially']:
+                revenue_net *= -1
+                revenue_total *= -1
 
             if date not in aggregated_data:
                 aggregated_data[date] = {'orders': 0, 'revenue_net': 0.0, 'revenue_total': 0.0}
@@ -164,10 +200,8 @@ def export_to_google_sheets(df):
     spreadsheet = client.open_by_url(SPREADSHEET_URL)
     worksheet = spreadsheet.worksheet(TARGET_SHEET)
     worksheet.clear()
-
     worksheet.format('B2:B', {'numberFormat': {'type': 'NUMBER'}})
     set_with_dataframe(worksheet, df, include_index=False, include_column_header=True, resize=True)
-
     print(f"✅ Data exported successfully to Google Sheet: '{TARGET_SHEET}'")
 
 # ------------------------------------------------------------------------------
@@ -175,7 +209,6 @@ def export_to_google_sheets(df):
 # ------------------------------------------------------------------------------
 if __name__ == "__main__":
     print("🚀 Starting Shopware Order Sync...")
-
     access_token = get_shopware_access_token()
     orders_data = fetch_orders(access_token)
 
@@ -185,5 +218,4 @@ if __name__ == "__main__":
 
     df = process_data(orders_data)
     export_to_google_sheets(df)
-
     print("🎉 Sync complete!")
