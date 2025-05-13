@@ -54,7 +54,14 @@ def fetch_all_orders(access_token):
                         "gte": "2022-01-01T00:00:00.000Z"
                     }
                 }
-            ]
+            ],
+            "associations": {
+                "transactions": {
+                    "associations": {
+                        "stateMachineState": {}
+                    }
+                }
+            }
         }
 
         response = requests.post(SHOPWARE_API_URL, headers=headers, json=payload)
