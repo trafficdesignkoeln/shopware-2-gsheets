@@ -13,8 +13,8 @@ from dateutil import parser
 # CONFIGURATION
 # ------------------------------------------------------------------------------
 SHOPWARE_API_URL = "https://www.mediatec.de/api/search/order"
-SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1YIz6plMZUPPu6QsRoCLWawIKpnwJRhp0xnP4PFkXajw/edit#gid=1254539016"
-TARGET_SHEET = "[Data] Shopware Orders NEW"
+SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1igRlquOuglaRLonNdC8HNASsbQqE3HHmwRtqCnAd3fQ/edit?gid=1744936381#gid=1744936381"
+TARGET_SHEET = "[Data] Shopware Orders"
 
 CLIENT_ID = os.getenv("SHOPWARE_CLIENT_ID")
 CLIENT_SECRET = os.getenv("SHOPWARE_CLIENT_SECRET")
